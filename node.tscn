@@ -1,0 +1,124 @@
+[gd_scene load_steps=2 format=3 uid="uid://ckenkdg44dhhu"]
+
+[sub_resource type="GDScript" id="GDScript_d1ncq"]
+script/source = "extends Node
+
+const BABOONS = 20
+const NORTH_SIDE = Vector2(350,0)
+const SOUTH_SIDE = Vector2(-350,0)
+var threads = []
+var rope_direction : int  # 0 = south, 1 = north
+var baboons_on_rope : int
+var mutex = Mutex.new()
+
+func _ready() -> void:
+	randomize()
+	rope_direction = 0
+	baboons_on_rope = 0
+	
+	# Criando babuínos com direções aleatórias
+	for i in range(BABOONS):
+		var thread = Thread.new()
+		thread.start(baboon_thread.bind(i, randi_range(0, 1),thread))
+		threads.append(thread)
+		
+		#OS.delay_msec(randi_range(1000,2000)) 
+
+
+
+#Função necessária para finalização limpa na godot
+func _exit_tree():
+	for thread:Thread in threads:
+		thread.wait_to_finish()
+
+#Thread que representa o babuíno
+func baboon_thread(baboon_id: int, direction: int, thread:Thread) -> void:
+	var crossTime = 2000
+	if direction == 1:
+		var sprite = spawn_sprite(NORTH_SIDE, \"res://icon.svg\")
+		sprite.modulate = Color(0,1,1)
+		_enter_rope(baboon_id, 1)
+		call_deferred(\"move_sprite\",SOUTH_SIDE+Vector2(-100,0),sprite,crossTime)
+		OS.delay_msec(crossTime)  # Crossing time
+		call_deferred(\"_exit_rope\",baboon_id, thread)
+
+	else:
+		var sprite = spawn_sprite(SOUTH_SIDE, \"res://icon.svg\")
+		sprite.modulate = Color(1,1,0)
+		_enter_rope(baboon_id, 0)
+		call_deferred(\"move_sprite\",NORTH_SIDE+Vector2(100,0),sprite,crossTime)
+		OS.delay_msec(crossTime)  # Crossing time
+
+		call_deferred(\"_exit_rope\",baboon_id, thread)
+
+
+#Função que controla a entrada na corda
+func _enter_rope(baboon_id: int, desired_direction: int) -> void:
+	while true:
+		mutex.lock()
+		var can_enter = false
+		
+		#Primeiro a entrar designa a direção que a corda deve ser atravessada
+		if baboons_on_rope == 0:
+			rope_direction = desired_direction
+			can_enter = true
+		#Apenas babuínos que dejam ir para a mesma direção atual podem entrar
+		elif baboons_on_rope < 5 and rope_direction == desired_direction:
+			can_enter = true
+			
+		if can_enter:
+			baboons_on_rope += 1
+			OS.delay_msec(100)  # Delay até tentar novamente
+
+			print(\"B%d: Entering rope going %s (%d on rope)\" % [
+				baboon_id, 
+				\"NORTH\" if desired_direction == 1 else \"SOUTH\",
+				baboons_on_rope
+			])
+			mutex.unlock()
+			return
+			
+		mutex.unlock()
+		OS.delay_msec(100)  # Delay até tentar novamente
+
+#Função que controla a saída da corda
+func _exit_rope(baboon_id: int, thread:Thread) -> void:
+	#Obtém o lock, diminui a contagem e libera novamente
+	mutex.lock()
+	baboons_on_rope -= 1
+	print(\"B%d: Exited rope (%d remaining)\" % [baboon_id, baboons_on_rope])
+	mutex.unlock()
+	thread.wait_to_finish()
+
+
+# ------- Visualização ------------
+
+func spawn_sprite(position: Vector2, texture_path: String):
+	# Create a new Sprite2D
+	var sprite = Sprite2D.new()
+	
+	# Load and set the texture
+	var texture = load(texture_path)
+	sprite.texture = texture
+	
+	# Set its position
+	sprite.position = position
+	
+	# Add it to the scene tree
+	call_deferred(\"add_child\",sprite)
+	
+	print(\"Spawned Sprite2D at position:\", position)
+	return sprite
+	
+func move_sprite(endpos:Vector2,sprite:Sprite2D,time:int):
+	var tween = create_tween()
+	tween.tween_property(sprite,\"position\",endpos,time/1000)
+	tween.set_ease(Tween.EASE_IN_OUT)
+	tween.set_trans(Tween.TRANS_LINEAR)
+	
+"
+
+[node name="Node" type="Node"]
+script = SubResource("GDScript_d1ncq")
+
+[node name="Camera2D" type="Camera2D" parent="."]
