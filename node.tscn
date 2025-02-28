@@ -3,7 +3,7 @@
 [sub_resource type="GDScript" id="GDScript_d1ncq"]
 script/source = "extends Node
 
-const BABOONS = 20
+const BABOONS = 50
 const NORTH_SIDE = Vector2(350,0)
 const SOUTH_SIDE = Vector2(-350,0)
 var threads = []
@@ -23,8 +23,6 @@ func _ready() -> void:
 		threads.append(thread)
 		
 		#OS.delay_msec(randi_range(1000,2000)) 
-
-
 
 #Função necessária para finalização limpa na godot
 func _exit_tree():
@@ -90,20 +88,16 @@ func _exit_rope(baboon_id: int, thread:Thread) -> void:
 	mutex.unlock()
 	thread.wait_to_finish()
 
-
 # ------- Visualização ------------
 
 func spawn_sprite(position: Vector2, texture_path: String):
 	# Create a new Sprite2D
 	var sprite = Sprite2D.new()
-	
 	# Load and set the texture
 	var texture = load(texture_path)
 	sprite.texture = texture
-	
 	# Set its position
 	sprite.position = position
-	
 	# Add it to the scene tree
 	call_deferred(\"add_child\",sprite)
 	
